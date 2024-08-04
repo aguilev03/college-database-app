@@ -1,35 +1,42 @@
 import database_functions
 
 
-def validation(table, columns, value, comparison, file):
-    """
-    Validates the existence of a record in a specified table based on a condition.
-
-    This function checks if there exists at least one record in the specified
-    SQL table that meets the given condition. It queries the table for a specific
-    value in a specified column and returns True if the value is found, otherwise False.
-
-    Parameters:
-    table (str): The name of the table to query.
-    columns (str): The column(s) to select from the table.
-    value (str): The column name to compare against.
-    comparison (str or int): The value to search for in the specified column.
-    file (str): The path to the SQLite database file.
-
-    Returns:
-    bool: True if the record exists, False otherwise.
-    """
-    command = f"SELECT {columns} FROM {table} WHERE {value} = ?"
-    result = database_functions.read_from_database(file, (command, (comparison)), "one")
-    if result:
-        return True
-    else:
-        return False
-
-
 class Tables:
     def __init__(self):
         self.file = "college_data.db"
+
+    def validation(
+        self,
+        table,
+        columns,
+        value,
+        comparison,
+    ):
+        """
+        Validates the existence of a record in a specified table based on a condition.
+
+        This function checks if there exists at least one record in the specified
+        SQL table that meets the given condition. It queries the table for a specific
+        value in a specified column and returns True if the value is found, otherwise False.
+
+        Parameters:
+        table (str): The name of the table to query.
+        columns (str): The column(s) to select from the table.
+        value (str): The column name to compare against.
+        comparison (str or int): The value to search for in the specified column.
+        file (str): The path to the SQLite database file.
+
+        Returns:
+        bool: True if the record exists, False otherwise.
+        """
+        command = f"SELECT {columns} FROM {table} WHERE {value} = ?"
+        result = database_functions.read_from_database(
+            self.file, (command, (comparison)), "one"
+        )
+        if result:
+            return True
+        else:
+            return False
 
     def create_row(self, table_name, values):
         """
@@ -57,9 +64,28 @@ class Tables:
                 WHERE {primary} = '{primary_value} """
         database_functions.write_to_database(self.file, command)
 
-    def delete_row(self, table_name, primary, primary_value):
-        command = "DELETE FROM ? WHERE ? = ?,", (table_name, primary, primary_value)
-        database_functions.write_to_database(self.file, command)
+    def delete_row(self, table_name, primary_key, primary_value, extra_arguments=None):
+        """
+        Deletes a row from the specified table in the database based on the primary key value.
+
+        This function constructs an SQL DELETE statement to remove a row from the given
+        table where the primary key column matches the provided value. The function uses
+        parameterized queries to ensure the operation is safe and prevent SQL injection.
+
+        Parameters:
+        table_name (str): The name of the table from which to delete the row.
+        primary (str): The name of the primary key column used to identify the row.
+        primary_value (str or int): The value of the primary key for the row to delete.
+
+        Returns:
+        None
+        """
+        if extra_arguments is None:
+            command = f"DELETE FROM {table_name} WHERE {primary_key} = ?"
+            database_functions.write_to_database(self.file, command, (primary_value,))
+        else:
+            command = f"DELETE FROM {table_name} WHERE {primary_key[0]} = ? AND {primary_value[1]} = ?"
+            database_functions.write_to_database(self.file, command, primary_value)
 
     def get_id(self, table, query):
         command = f"SELECT id FROM ? WHERE name = ?"
@@ -160,13 +186,20 @@ class Students(Tables):
 
     def enroll(self, course_id):
         if self.id is not None:
-            class_exist = validation("courses", "*", "id", course_id, self.file)
+            class_exist = self.validation("courses", "*", "id", course_id)
             if class_exist:
-                enrolled_check = validation(
-                    "course_students", "*", course_id, self.id, self.file
+                enrolled_check = self.validation(
+                    "course_students", "*", course_id, self.id
                 )
                 if enrolled_check == False:
-                    self.create_row()
+                    self.create_row("course_students", (course_id, self.id))
+
+    def withdrawl(self, course_id):
+        enrolled_check = self.validation("course_students", "*", course_id, self.id)
+        if enrolled_check:
+            self.delete_row(
+                "course_students", ("course_id", "student_id"), (course_id, self.id)
+            )
 
 
 class Instructors(Tables):
@@ -196,6 +229,25 @@ class Instructors(Tables):
             self.department_id = department_id
         if id is not None:
             self.id = id
+
+    def assign_course(self, course_id):
+        if self.id is not None:
+            class_exist = self.validation("courses", "*", "id", course_id)
+            if class_exist:
+                assigned_check = self.validation(
+                    "course_instructors", "*", course_id, self.id
+                )
+                if assigned_check == False:
+                    self.create_row("course_instructors", (course_id, self.id))
+
+    def unassign(self, course_id):
+        assigned_check = self.validation("course_instructors", "*", course_id, self.id)
+        if assigned_check:
+            self.delete_row(
+                "course_instructors",
+                ("course_id", "instructor_id"),
+                (course_id, self.id),
+            )
 
 
 class Staff(Tables):
