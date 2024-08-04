@@ -1,0 +1,154 @@
+{
+    "departments": [
+      {
+        "name": "Computer Science",
+        "classes": [
+          {
+            "name": "Introduction to Programming",
+            "professor": "Dr. Alice Johnson",
+            "students_enrolled": 45
+          },
+          {
+            "name": "Data Structures",
+            "professor": "Dr. Bob Smith",
+            "students_enrolled": 35
+          },
+          {
+            "name": "Algorithms",
+            "professor": "Dr. Carol Martinez",
+            "students_enrolled": 30
+          },
+          {
+            "name": "Operating Systems",
+            "professor": "Dr. David Lee",
+            "students_enrolled": 40
+          },
+          {
+            "name": "Database Systems",
+            "professor": "Dr. Emily Davis",
+            "students_enrolled": 50
+          }
+        ]
+      },
+      {
+        "name": "Business Administration",
+        "classes": [
+          {
+            "name": "Introduction to Business",
+            "professor": "Dr. Frank Miller",
+            "students_enrolled": 60
+          },
+          {
+            "name": "Marketing Principles",
+            "professor": "Dr. Grace Wilson",
+            "students_enrolled": 55
+          },
+          {
+            "name": "Financial Accounting",
+            "professor": "Dr. Henry Moore",
+            "students_enrolled": 50
+          },
+          {
+            "name": "Organizational Behavior",
+            "professor": "Dr. Irene Taylor",
+            "students_enrolled": 40
+          },
+          {
+            "name": "Business Ethics",
+            "professor": "Dr. Jack Anderson",
+            "students_enrolled": 45
+          }
+        ]
+      },
+      {
+        "name": "Engineering",
+        "classes": [
+          {
+            "name": "Introduction to Engineering",
+            "professor": "Dr. Karen Clark",
+            "students_enrolled": 70
+          },
+          {
+            "name": "Thermodynamics",
+            "professor": "Dr. Larry King",
+            "students_enrolled": 35
+          },
+          {
+            "name": "Fluid Mechanics",
+            "professor": "Dr. Michael Young",
+            "students_enrolled": 30
+          },
+          {
+            "name": "Circuit Analysis",
+            "professor": "Dr. Nancy Adams",
+            "students_enrolled": 40
+          },
+          {
+            "name": "Control Systems",
+            "professor": "Dr. Oscar Brown",
+            "students_enrolled": 45
+          }
+        ]
+      },
+      {
+        "name": "Psychology",
+        "classes": [
+          {
+            "name": "Introduction to Psychology",
+            "professor": "Dr. Patricia Harris",
+            "students_enrolled": 80
+          },
+          {
+            "name": "Cognitive Psychology",
+            "professor": "Dr. Quentin Lewis",
+            "students_enrolled": 50
+          },
+          {
+            "name": "Developmental Psychology",
+            "professor": "Dr. Rachel Walker",
+            "students_enrolled": 55
+          },
+          {
+            "name": "Social Psychology",
+            "professor": "Dr. Steven Hall",
+            "students_enrolled": 60
+          },
+          {
+            "name": "Clinical Psychology",
+            "professor": "Dr. Teresa Martin",
+            "students_enrolled": 40
+          }
+        ]
+      },
+      {
+        "name": "Biology",
+        "classes": [
+          {
+            "name": "General Biology",
+            "professor": "Dr. Ursula White",
+            "students_enrolled": 90
+          },
+          {
+            "name": "Genetics",
+            "professor": "Dr. Victor Thompson",
+            "students_enrolled": 45
+          },
+          {
+            "name": "Microbiology",
+            "professor": "Dr. Wendy Garcia",
+            "students_enrolled": 35
+          },
+          {
+            "name": "Ecology",
+            "professor": "Dr. Xavier Robinson",
+            "students_enrolled": 40
+          },
+          {
+            "name": "Human Anatomy",
+            "professor": "Dr. Yolanda Perez",
+            "students_enrolled": 50
+          }
+        ]
+      }
+    ]
+  }
