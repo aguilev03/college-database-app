@@ -1,42 +1,54 @@
 import sqlite3
 
 
-def write_to_database(file, instructions):
+def write_to_database(file, instructions, values=None):
     """
     Executes a write operation on the specified SQLite database.
 
     This function connects to the SQLite database specified by the 'file' parameter,
-    executes the SQL command provided in the 'instructions' parameter, commits the
-    changes, and then closes the connection.
+    executes the SQL command provided in the 'instructions' parameter with the
+    provided values, commits the changes, and then closes the connection.
 
     Parameters:
     file (str): The path to the SQLite database file.
     instructions (str): The SQL command to execute (e.g., INSERT, UPDATE, DELETE).
+    values (tuple, optional): A tuple containing the values to safely substitute into the SQL command.
 
     Returns:
     None
     """
     conn = sqlite3.connect(file)
     c = conn.cursor()
-    c.execute(instructions)
+    if values:
+        c.execute(instructions, values)
+    else:
+        c.execute(instructions)
     conn.commit()
     conn.close()
 
 
-def read_from_database(file, instructions, action):
+def read_from_database(file, instructions, action="all"):
     """
     Executes a read operation on the specified SQLite database and retrieves the results.
 
     This function connects to the SQLite database specified by the 'file' parameter,
-    executes the SQL query provided in the 'instructions' parameter, fetches all the
-    resulting data, and then closes the connection.
+    executes the SQL query provided in the 'instructions' parameter, and retrieves
+    the data based on the specified 'action'. The connection to the database is closed
+    after the operation.
 
     Parameters:
     file (str): The path to the SQLite database file.
     instructions (str): The SQL query to execute (e.g., SELECT).
+    action (str or tuple): Determines the amount of data to fetch from the query.
+        - "all": Fetches all rows from the result set.
+        - "one": Fetches a single row from the result set.
+        - ("many", int): Fetches a specified number of rows (int) from the result set.
 
     Returns:
-    list: A list of tuples containing the rows of the result set.
+    list or tuple or None:
+        - If action is "all", returns a list of tuples containing all rows.
+        - If action is "one", returns a single tuple representing one row or None if no more rows are available.
+        - If action is ("many", int), returns a list of tuples containing the specified number of rows.
     """
     conn = sqlite3.connect(file)
     c = conn.cursor()
