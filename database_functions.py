@@ -2,6 +2,20 @@ import sqlite3
 
 
 def write_to_database(file, instructions):
+    """
+    Executes a write operation on the specified SQLite database.
+
+    This function connects to the SQLite database specified by the 'file' parameter,
+    executes the SQL command provided in the 'instructions' parameter, commits the
+    changes, and then closes the connection.
+
+    Parameters:
+    file (str): The path to the SQLite database file.
+    instructions (str): The SQL command to execute (e.g., INSERT, UPDATE, DELETE).
+
+    Returns:
+    None
+    """
     conn = sqlite3.connect(file)
     c = conn.cursor()
     c.execute(instructions)
@@ -10,6 +24,20 @@ def write_to_database(file, instructions):
 
 
 def read_from_database(file, instructions):
+    """
+    Executes a read operation on the specified SQLite database and retrieves the results.
+
+    This function connects to the SQLite database specified by the 'file' parameter,
+    executes the SQL query provided in the 'instructions' parameter, fetches all the
+    resulting data, and then closes the connection.
+
+    Parameters:
+    file (str): The path to the SQLite database file.
+    instructions (str): The SQL query to execute (e.g., SELECT).
+
+    Returns:
+    list: A list of tuples containing the rows of the result set.
+    """
     conn = sqlite3.connect(file)
     c = conn.cursor()
     c.execute(instructions)
@@ -19,6 +47,27 @@ def read_from_database(file, instructions):
 
 
 def initial_write(file):
+    """
+    Initializes the database with required tables and populates them with dummy data.
+
+    This function creates the following tables in the specified SQLite database:
+    - departments
+    - courses
+    - students
+    - instructors
+    - staff
+    - course_students (junction table for courses and students)
+    - course_instructors (junction table for courses and instructors)
+
+    It also inserts initial dummy data into each table, providing sample departments,
+    courses, students, instructors, and staff records.
+
+    Parameters:
+    file (str): The path to the SQLite database file where the tables and data will be created.
+
+    Returns:
+    None
+    """
     create_departments_sql = """CREATE TABLE departments (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 name TEXT NOT NULL,
@@ -150,6 +199,21 @@ def initial_write(file):
 
 
 def main():
+        """
+    Main function to test database operations.
+
+    This function initializes a SQLite database file named 'college_data.db'.
+    It then reads all records from the 'students' table and prints them.
+
+    The function demonstrates the use of the `read_from_database` function to
+    query data from the database.
+
+    Parameters:
+    None
+
+    Returns:
+    None
+    """
 
     database_file = "college_data.db"
 
