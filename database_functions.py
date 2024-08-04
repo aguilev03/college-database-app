@@ -23,7 +23,7 @@ def write_to_database(file, instructions):
     conn.close()
 
 
-def read_from_database(file, instructions):
+def read_from_database(file, instructions, action):
     """
     Executes a read operation on the specified SQLite database and retrieves the results.
 
@@ -41,7 +41,13 @@ def read_from_database(file, instructions):
     conn = sqlite3.connect(file)
     c = conn.cursor()
     c.execute(instructions)
-    data = c.fetchall()
+    if action.lower() == "one":
+        data = c.fetchone()
+    elif action[0].lower() == "many":
+        data = c.fetchmany(action[1])
+    else:
+        data = c.fetchall()
+
     conn.close()
     return data
 
@@ -199,7 +205,7 @@ def initial_write(file):
 
 
 def main():
-        """
+    """
     Main function to test database operations.
 
     This function initializes a SQLite database file named 'college_data.db'.
