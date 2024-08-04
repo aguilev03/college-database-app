@@ -59,10 +59,28 @@ class Tables:
         database_functions.write_to_database(self.file, command, values)
 
     def update_row(self, table_name, primary, primary_value, changes):
+        """
+        Updates a row in the specified table based on the primary key.
+
+        This function constructs an SQL UPDATE statement to modify a row in the specified
+        table. It updates the columns as specified in the `changes` parameter where the
+        primary key column matches the provided value.
+
+        Parameters:
+        table_name (str): The name of the table where the row needs to be updated.
+        primary (str): The primary key column used to identify the row.
+        primary_value (str or int): The value of the primary key to match the row.
+        changes (dict): A dictionary specifying the columns and their new values.
+
+        Returns:
+        None
+        """
+        placeholders = ", ".join([f"{key} = ?" for key in changes.keys()])
         command = f"""UPDATE {table_name}
-                SET {changes} 
-                WHERE {primary} = '{primary_value} """
-        database_functions.write_to_database(self.file, command)
+                SET {placeholders}
+                WHERE {primary} = ?"""
+        values = tuple(changes.values()) + (primary_value,)
+        database_functions.write_to_database(self.file, command, values)
 
     def delete_row(self, table_name, primary_key, primary_value, extra_arguments=None):
         """
@@ -88,8 +106,24 @@ class Tables:
             database_functions.write_to_database(self.file, command, primary_value)
 
     def get_id(self, table, query):
-        command = f"SELECT id FROM ? WHERE name = ?"
-        id = database_functions.read_from_database(self.file, command, "one")
+        """
+        Retrieves the ID of a row from the specified table where the name matches the query.
+
+        This function constructs an SQL SELECT statement to fetch the ID of a row
+        from the given table where the 'name' column matches the specified query value.
+        It uses a parameterized query to ensure safe execution and prevent SQL injection.
+
+        Parameters:
+        table (str): The name of the table to search in.
+        query (str): The value to match in the 'name' column.
+
+        Returns:
+        int or None: The ID of the matching row if found, otherwise None.
+        """
+        command = f"SELECT id FROM {table} WHERE name = ?"
+        result = database_functions.read_from_database(
+            self.file, command, (query,), "one"
+        )
         if id:
             return id[0]
         else:
@@ -100,7 +134,17 @@ class Departments(Tables):
     def __init__(self, name, description):
         self.name = name
         self.description = description
-        self.id = None
+        self.table = "departments"
+        self.id = self.get_id(self.table, self.name)
+
+    def add(self):
+        if self.id is None:
+            self.create_row(self.table, (self.name, self.email, self.major))
+            self.id = self.get_id(self.table, self.name)
+
+    def remove(self):
+        if self.id is not None:
+            self.delete_row(self.table, "id", self.id)
 
     def update_department(self, name=None, description=None, id=None):
         """
@@ -114,12 +158,16 @@ class Departments(Tables):
         Only the provided attributes will be updated. If both are provided,
         both will be updated.
         """
+        changes = {}
         if name is not None:
-            self.name = name
+            changes["name"] = name
         if description is not None:
-            self.description = description
-        if id is not None:
-            self.id = id
+            changes["description"] = description
+        if id is None:
+            changes["id"] = self.get_id(self.table, self.name)
+
+        if changes:
+            self.update_row(self.table, "id", self.id, changes)
 
 
 class Courses(Tables):
@@ -128,7 +176,17 @@ class Courses(Tables):
         self.department_id = department_id
         self.description = description
         self.credits = credits
-        self.id = None
+        self.table = "courses"
+        self.id = self.get_id(self.table, self.name)
+
+    def add(self):
+        if self.id is None:
+            self.create_row(self.table, (self.name, self.email, self.major))
+            self.id = self.get_id(self.table, self.name)
+
+    def remove(self):
+        if self.id is not None:
+            self.delete_row(self.table, "id", self.id)
 
     def update_course(
         self, name=None, department_id=None, description=None, credits=None, id=None
@@ -144,16 +202,20 @@ class Courses(Tables):
         Only the provided attributes will be updated. If both are provided,
         both will be updated.
         """
+        changes = {}
         if name is not None:
-            self.name = name
+            changes["name"] = name
         if department_id is not None:
-            self.department_id = department_id
+            changes["department_id"] = department_id
         if description is not None:
-            self.description = description
+            changes["description"] = description
         if credits is not None:
-            self.credits = credits
-        if id is not None:
-            self.id = id
+            changes["credits"] = credits
+        if id is None:
+            self.id = self.get_id(self.table, "id")
+
+        if changes:
+            self.update_row(self.table, "id", self.id, changes)
 
 
 class Students(Tables):
@@ -161,9 +223,16 @@ class Students(Tables):
         self.name = name
         self.email = email
         self.major = major
-        self.id = None
+        self.table = "students"
+        self.id = self.get_id(self.table, self.name)
 
-    def update_student(self, name=None, email=None, major=None, id=None):
+    def add(self):
+        if self.id is None:
+            self.create_row(self.table, (self.name, self.email, self.major))
+            print("Student added")
+            self.id = self.get_id(self.table, self.name)
+
+    def update(self, name=None, email=None, major=None, id=None):
         """
         Updates the department's name or description.
 
@@ -175,14 +244,18 @@ class Students(Tables):
         Only the provided attributes will be updated. If both are provided,
         both will be updated.
         """
+        changes = {}
         if name is not None:
-            self.name = name
+            changes["name"] = name
         if email is not None:
-            self.email = email
+            changes["email"] = email
         if major is not None:
-            self.major = major
-        if id is not None:
-            self.id = id
+            changes["major"] = major
+        if id is None:
+            self.id = self.get_id(self.table, "id")
+
+        if changes:
+            self.update_row(self.table, "id", self.id, changes)
 
     def enroll(self, course_id):
         if self.id is not None:
@@ -201,13 +274,23 @@ class Students(Tables):
                 "course_students", ("course_id", "student_id"), (course_id, self.id)
             )
 
+    def remove(self):
+        if self.id is not None:
+            self.delete_row(self.table, "id", self.id)
+
 
 class Instructors(Tables):
     def __init__(self, name, email, department_id):
         self.name = name
         self.email = email
         self.department_id = department_id
-        self.id = None
+        self.table = "instructors"
+        self.id = self.get_id(self.table, self.name)
+
+    def add(self):
+        if self.id is None:
+            self.create_row(self.table, (self.name, self.email, self.major))
+            self.id = self.get_id(self.table, self.name)
 
     def update_instructor(self, name=None, email=None, department_id=None, id=None):
         """
@@ -221,14 +304,18 @@ class Instructors(Tables):
         Only the provided attributes will be updated. If both are provided,
         both will be updated.
         """
+        changes = {}
         if name is not None:
-            self.name = name
+            changes["name"] = name
         if email is not None:
-            self.email = email
+            changes["email"] = email
         if department_id is not None:
-            self.department_id = department_id
-        if id is not None:
-            self.id = id
+            changes["department_id"] = department_id
+        if id is None:
+            self.id = self.get_id(self.table, "id")
+
+        if changes:
+            self.update_row(self.table, "id", self.id, changes)
 
     def assign_course(self, course_id):
         if self.id is not None:
@@ -249,13 +336,27 @@ class Instructors(Tables):
                 (course_id, self.id),
             )
 
+    def remove(self):
+        if self.id is not None:
+            self.delete_row(self.table, "id", self.id)
+
 
 class Staff(Tables):
     def __init__(self, name, role, department_id):
         self.name = name
         self.role = role
         self.department_id = department_id
-        self.id = None
+        self.table = "staff"
+        self.id = self.get_id(self.id, self.name)
+
+    def add(self):
+        if self.id is None:
+            self.create_row(self.table, (self.name, self.email, self.major))
+            self.id = self.get_id(self.table, self.name)
+
+    def remove(self):
+        if self.id is not None:
+            self.delete_row(self.table, "id", self.id)
 
     def update_staff(self, name=None, role=None, department_id=None, id=None):
         """
@@ -269,11 +370,42 @@ class Staff(Tables):
         Only the provided attributes will be updated. If both are provided,
         both will be updated.
         """
+        changes = {}
         if name is not None:
-            self.name = name
+            changes["name"] = name
         if role is not None:
-            self.role = role
+            changes["role"] = role
         if department_id is not None:
-            self.department_id = department_id
-        if id is not None:
-            self.id = id
+            changes["department_id"] = department_id
+        if id is None:
+            self.id = self.get_id(self.table, "id")
+
+        if changes:
+            self.update_row(self.table, "id", self.id, changes)
+
+
+class Views:
+    def __init__(self):
+        self.file = "college_data.db"
+
+    def get_table_data(self, table, columns="*"):
+        """
+        Retrieves specified columns or all columns from the given table in the database.
+
+        This function constructs an SQL SELECT statement to fetch data from the specified
+        table. If no specific columns are provided, all columns are selected by default.
+
+        Parameters:
+        table (str): The name of the table to retrieve data from.
+        columns (str): A comma-separated string of column names to retrieve, or "*" to retrieve all columns.
+
+        Returns:
+        list: A list of tuples containing the rows of the result set.
+        """
+        if columns == "*":
+            command = f"SELECT * FROM {table}"
+        else:
+            command = f"SELECT {columns} FROM {table}"
+
+        data = database_functions.read_from_database(self.file, command)
+        return data
