@@ -131,11 +131,11 @@ class Tables:
 
 
 class Departments(Tables):
-    def __init__(self, name, description):
+    def __init__(self, name, description, id=None):
         self.name = name
         self.description = description
         self.table = "departments"
-        self.id = self.get_id(self.table, self.name)
+        self.id = id
 
     def add(self):
         if self.id is None:
@@ -171,13 +171,14 @@ class Departments(Tables):
 
 
 class Courses(Tables):
-    def __init__(self, name, department_id, description, credits):
+    def __init__(self, name, department_id, description, credits, id=None):
         self.name = name
         self.department_id = department_id
         self.description = description
         self.credits = credits
+        self.file = "college_data.db"
         self.table = "courses"
-        self.id = self.get_id(self.table, self.name)
+        self.id = id
 
     def add(self):
         if self.id is None:
@@ -217,14 +218,25 @@ class Courses(Tables):
         if changes:
             self.update_row(self.table, "id", self.id, changes)
 
+    def get_instructor(self):
+        command = f"""SELECT instructors.name
+                    FROM instructors
+                    JOIN course_instructors ON instructors.id = course_instructors.instructor_id
+                    WHERE course_instructors.course_id = ?"""
+
+        return database_functions.read_from_database(
+            self.file, command, "one", (self.id,)
+        )
+
 
 class Students(Tables):
-    def __init__(self, name, email, major):
+    def __init__(self, name, email, major, id=None):
         self.name = name
         self.email = email
         self.major = major
+        self.file = "college_data.db"
         self.table = "students"
-        self.id = self.get_id(self.table, self.name)
+        self.id = id
 
     def add(self):
         if self.id is None:
@@ -278,14 +290,42 @@ class Students(Tables):
         if self.id is not None:
             self.delete_row(self.table, "id", self.id)
 
+    def get_courses(self):
+        columns = [
+            "courses.id",
+            "courses.name",
+            "courses.department_id",
+            "courses.description",
+            "courses.credits",
+        ]
+
+        tables = ("courses", "course_students")
+
+        comparison = "courses.id = course_students.course_id"
+
+        where = "course_students.student_id"
+
+        set_columns = ", ".join([f"{column}" for column in columns])
+        command = f"""SELECT {set_columns}
+                FROM {tables[0]}
+                JOIN {tables[1]} ON {comparison}
+                WHERE {where} = ?"""
+        print(self.id)
+        classes_registered = database_functions.read_from_database(
+            self.file, command, "all", (self.id,)
+        )
+        print(classes_registered)
+        return classes_registered
+
 
 class Instructors(Tables):
-    def __init__(self, name, email, department_id):
+    def __init__(self, name, email, department_id, id=None):
         self.name = name
         self.email = email
+        self.file = "college_data.db"
         self.department_id = department_id
         self.table = "instructors"
-        self.id = self.get_id(self.table, self.name)
+        self.id = id
 
     def add(self):
         if self.id is None:
@@ -342,12 +382,13 @@ class Instructors(Tables):
 
 
 class Staff(Tables):
-    def __init__(self, name, role, department_id):
+    def __init__(self, name, role, department_id, id=None):
         self.name = name
         self.role = role
         self.department_id = department_id
+        self.file = "college_data.db"
         self.table = "staff"
-        self.id = self.get_id(self.id, self.name)
+        self.id = id
 
     def add(self):
         if self.id is None:
@@ -408,4 +449,5 @@ class Views:
             command = f"SELECT {columns} FROM {table}"
 
         data = database_functions.read_from_database(self.file, command)
+
         return data

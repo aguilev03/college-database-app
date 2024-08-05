@@ -1,18 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Eel App</title>
-    </head>
-    <body>
-        <h1>Classes</h1>
-        <button id="mybtn">Get data</button>
+<html>
+<head>
+    <title>Role Selection</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div id="role-selection">
+        <label for="role">Select your role:</label>
+        <select id="role">
+            <option value="student">Student</option>
+            <option value="admin">Administrator</option>
+            <option value="professor">Professor</option>
+        </select>
+        <button id="login-btn">Login</button>
+    </div>
 
+    <div id="main-menu" style="display:none;">
+        <h1>Welcome to the Main Menu</h1>
+        <div id="student-content" style="display:none;">
+            <label for="student-list">Select Student:</label>
+            <select id="student-list"></select>
+            <button id="load-classes-btn">Load Classes</button>
+            <div id="class-table-container" style="display:none;">
+                <h2>Enrolled Classes</h2>
+                <table id="class-table">
+                    <thead>
+                        <tr>
+                            <th>Class ID</th>
+                            <th>Class Name</th>
+                            <th>Department ID/th>
+                            <th>Description</th>
+                            <th>Credits</th>
+                            <th>Instructor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Class data will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p id="myele"></p>
+    </div>
 
-    </body>
-
-    <script type="text/javascript" src="/eel.js"></script>
     <script src="index.js"></script>
+    <script type="text/javascript" src="/eel.js"></script> <!-- Include Eel -->
+</body>
 </html>

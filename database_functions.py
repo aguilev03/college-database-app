@@ -27,7 +27,7 @@ def write_to_database(file, instructions, values=None):
     conn.close()
 
 
-def read_from_database(file, instructions, action="all"):
+def read_from_database(file, instructions, action="all", values=None):
     """
     Executes a read operation on the specified SQLite database and retrieves the results.
 
@@ -52,15 +52,24 @@ def read_from_database(file, instructions, action="all"):
     """
     conn = sqlite3.connect(file)
     c = conn.cursor()
-    c.execute(instructions)
-    if action.lower() == "one":
-        data = c.fetchone()
-    elif action[0].lower() == "many":
-        data = c.fetchmany(action[1])
-    else:
-        data = c.fetchall()
+    try:
+        if values:
+            c.execute(instructions, values)
+        else:
+            c.execute(instructions)
 
-    conn.close()
+        if action == "one":
+            data = c.fetchone()
+        elif isinstance(action, tuple) and action[0] == "many":
+            data = c.fetchmany(action[1])
+        else:  # Default action is "all"
+            data = c.fetchall()
+    except sqlite3.Error as e:
+        print(f"An error occurred: {e}")
+        data = None
+    finally:
+        c.close()
+        conn.close()
     return data
 
 
