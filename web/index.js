@@ -36,7 +36,7 @@ $(document).ready(function(){
         }
 
         await eel.send_data(selectedRole);
-        document.getElementById('myele').innerText = await eel.get_data()();
+        //document.getElementById('myele').innerText = await eel.get_data()();
         $('#role-selection').hide();
         $('#main-menu').show();
     });
