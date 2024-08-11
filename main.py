@@ -215,130 +215,23 @@ def manage_department_detail(department):
 def manage_students():
     while True:
         clear_screen()
-
+        command_mapping = {
+            "gather_data": "get_students",
+            "add": "add",
+            "delete": "remove",
+        }
         student_view = collegeapp.Student_views()
-        student_attributes = ["name", "email", "major"]
+        student_attributes = ["id", "name", "email", "major"]
         display_columns = ["id ", "name", "email", "major"]
         manage_entities(
+            "manage_entities",
+            command_mapping,
             "student",
             collegeapp.Student_views,
+            collegeapp.Students,
             student_attributes,
             display_columns,
         )
-        student_list = student_view.get_students()
-        print("id\tname\temail\tmajor")
-        for student in student_list:
-            print(
-                f"{student['id']}\t{student['name']}\t{student['email']}\t{student['major']}"
-            )
-
-        print("\nManage Students Menu")
-        print("1) Add Student")
-        print("2) Remove Student by ID")
-        print("3) View Student by ID")
-        print("4) Back to Main Menu")
-        choice = input("Select an option: ").strip()
-
-        if choice == "1":
-            # Add student logic here
-            student_data = [
-                input("Please enter the Student's Name: "),
-                input("Please enter the Student's Email: "),
-                input("Please enter the Student's Major: "),
-            ]
-            student = collegeapp.Students(
-                student_data[0], student_data[1], student_data[2]
-            )
-            print(student.name, student.email, student.major)
-            student.add()
-            print("Add Student selected")
-            input("")
-        elif choice == "2":
-            # Remove student logic here
-            student_id = input(
-                "Please enter the Student ID you would like to remove: "
-            ).strip()
-
-            # Convert input to integer and handle potential conversion error
-            try:
-                student_id = int(student_id)
-            except ValueError:
-                print("Invalid ID. Please enter a numeric value.")
-                input("Press Enter to continue...")
-                continue  # Restart the loop
-
-            student_list = student_view.get_students()
-            student_found = False
-
-            for student in student_list:
-                if student["id"] == student_id:
-                    student_found = True
-                    student_delete = collegeapp.Students(
-                        student["name"],
-                        student["email"],
-                        student["major"],
-                        student["id"],
-                    )
-
-                    clear_screen()
-                    print(f"Student to delete: {student_delete.name}")
-
-                    remove_choice = input(
-                        "Remove the Student from the database? y/N "
-                    ).strip()
-                    if remove_choice.lower() == "y":
-                        student_delete.remove()
-                        print("Student removed successfully.")
-                        input("Press Enter to continue...")
-                    else:
-                        print("Delete operation cancelled.")
-                        input("Press Enter to continue...")
-                    break  # Exit the loop once the student is found and action is taken
-
-            if not student_found:
-                print("Student with the given ID was not found.")
-                input("Press Enter to continue...")
-
-        elif choice == "3":
-            # view student logic here
-            student_id = input(
-                "Please enter the Student ID you would like to view: "
-            ).strip()
-
-            # Convert input to integer and handle potential conversion error
-            try:
-                student_id = int(student_id)
-            except ValueError:
-                print("Invalid ID. Please enter a numeric value.")
-                input("Press Enter to continue...")
-                continue  # Restart the loop
-
-            student_list = student_view.get_students()
-            student_found = False
-
-            for student in student_list:
-                if student["id"] == student_id:
-                    student_found = True
-                    student_inspect = collegeapp.Students(
-                        student["name"],
-                        student["email"],
-                        student["major"],
-                        student["id"],
-                    )
-
-                    clear_screen()
-
-                    manage_student_courses(student_inspect)
-
-            if not student_found:
-                print("Student with the given ID was not found.")
-                input("Press Enter to continue...")
-
-        elif choice == "4":
-            print("Returning to the main menu...")
-            break
-        else:
-            print("Invalid choice, please try again.")
 
 
 def manage_student_courses(student):
@@ -347,6 +240,16 @@ def manage_student_courses(student):
         courses = student.get_courses()
         enrolled_classes = []
         clear_screen()
+
+        detailed_choices = [
+            "course",
+            {
+                "get": "get_courses",
+                "get_all": "get_all_courses",
+                "add": "enroll",
+                "remove": "withdraw",
+            },
+        ]
         print(f"{student.name}\tStudent ID: {student.id}")
         print(f"{student.email}\tMajor: {student.major} \n\nCurrently Enrolled")
         if courses:
@@ -1171,7 +1074,9 @@ def manage_entities(
             if choice == "1":
                 entity_data = []
                 for attr in attributes:
-                    if attr == "department_id":
+                    if attr == "id":
+                        continue
+                    elif attr == "department_id":
                         department_id = get_department_choice(
                             entity_view.get_all_departments()
                         )
@@ -1206,13 +1111,14 @@ def manage_entities(
                 for entity in entity_list:
                     if entity["id"] == entity_id:
                         entity_found = True
-                        entity_instance = entity_class(
-                            *[entity[attr] for attr in attributes], entity["id"]
-                        )
-
+                        entity_data = [
+                            entity[attr] for attr in attributes if attr != "id"
+                        ]
+                        entity_data.append(entity["id"])
+                        entity_instance = entity_class(*entity_data)
                         clear_screen()
                         print(
-                            f"{entity_name.capitalize()} to delete: {entity_instance}"
+                            f"{entity_name.capitalize()} to delete: {entity_instance.name}"
                         )
 
                         remove_choice = input(
@@ -1252,9 +1158,11 @@ def manage_entities(
                 for entity in entity_list:
                     if entity["id"] == entity_id:
                         entity_found = True
-                        entity_instance = entity_class(
-                            *[entity[attr] for attr in attributes], entity["id"]
-                        )
+                        entity_data = [
+                            entity[attr] for attr in attributes if attr != "id"
+                        ]
+                        entity_data.append(entity["id"])
+                        entity_instance = entity_class(*entity_data)
 
                         clear_screen()
 
@@ -1311,6 +1219,131 @@ def get_department_choice(departments):
 
         print("Department ID not found. Please enter a valid ID.")
         input("Press Enter to try again or leave blank to skip...")
+
+
+def manage_detail_long(
+    entity, entity_type, view_class, related_entity_name, related_entity_methods
+):
+    while True:
+        related_entities = getattr(entity, related_entity_methods["get"])()
+        enrolled_entities = []
+        clear_screen()
+        print(f"{entity.name}\t{entity_type.capitalize()} ID: {entity.id}")
+        print(
+            f"{entity.email}\t{related_entity_name.capitalize()}: {entity.major} \n\nCurrently Enrolled {related_entity_name.capitalize()}s"
+        )
+        if related_entities:
+            for related_entity in related_entities:
+                print(
+                    f"ID: {related_entity['course_id']}\t{related_entity['course_name']}\tCredits: {related_entity['course_credits']}\n",
+                    f"{related_entity['course_description']}\t Instructed by: {related_entity['instructor_name']}\n",
+                )
+
+        print(f"\nManage {entity_type.capitalize()} Menu")
+        print(f"1) Update {entity_type} information")
+        print(f"2) Remove {related_entity_name.capitalize()}")
+        print(f"3) Add {related_entity_name.capitalize()}")
+        print("4) Back to Previous Menu")
+        choice = input("Select an option: ").strip()
+
+        if choice == "1":
+            # Edit entity logic here
+            clear_screen()
+            print(f"{entity.name}\t{entity_type.capitalize()} ID: {entity.id}")
+            print(
+                f"{entity.email}\t{related_entity_name.capitalize()}: {entity.major} \n\nCurrently Enrolled {related_entity_name.capitalize()}s"
+            )
+            updated_data = {
+                "name": input(
+                    f"Please type updated Name or leave blank to leave unchanged: "
+                ),
+                "email": input(
+                    f"Please type updated email or leave blank to leave unchanged: "
+                ),
+                "major": input(
+                    f"Please type updated major or leave blank to leave unchanged: "
+                ),
+            }
+            update_push = {}
+            for key, value in updated_data.items():
+                if value != "":
+                    update_push[key] = value
+                else:
+                    update_push[key] = None
+
+            status = entity.update(
+                update_push["name"],
+                update_push["email"],
+                update_push["major"],
+                entity.id,
+            )
+            print(status)
+            entity.refresh()
+            input("Press Enter to continue")
+
+        elif choice == "2":
+            clear_screen()
+            print(f"{entity.name}\t{entity_type.capitalize()} ID: {entity.id}")
+            print(
+                f"{entity.email}\t{related_entity_name.capitalize()}: {entity.major} \n\nCurrently Enrolled {related_entity_name.capitalize()}s"
+            )
+            if related_entities:
+                for related_entity in related_entities:
+                    print(
+                        f"ID: {related_entity['course_id']}\t{related_entity['course_name']}\tCredits: {related_entity['course_credits']}\n",
+                        f"{related_entity['course_description']}\t Instructed by: {related_entity['instructor_name']}\n",
+                    )
+
+                x = input(
+                    f"Please enter {related_entity_name.capitalize()} ID to withdraw, leave blank to stop: "
+                )
+                try:
+                    related_entity_id = int(x)
+                    getattr(entity, related_entity_methods["remove"])(related_entity_id)
+                except ValueError:
+                    continue
+
+        elif choice == "3":
+            # Add related entity logic here
+            clear_screen()
+            print(f"{entity.name}\t{entity_type.capitalize()} ID: {entity.id}")
+            print(
+                f"{entity.email}\t{related_entity_name.capitalize()}: {entity.major} \n\nAvailable {related_entity_name.capitalize()}s"
+            )
+            views = view_class()
+            all_related_entities = getattr(views, related_entity_methods["get_all"])()
+            for related_entity in all_related_entities:
+                if related_entity["course_id"] not in enrolled_entities:
+                    print(
+                        f"ID: {related_entity['course_id']}\t{related_entity['course_name']}\tCredits: {related_entity['course_credits']}\n",
+                        f"{related_entity['course_description']}\t Instructed by: {related_entity['instructor_name']}\n",
+                    )
+
+            add_related_entity = []
+
+            while True:
+                x = input(
+                    f"Please enter {related_entity_name.capitalize()} ID to enroll, leave blank to stop: "
+                )
+                if x == "":
+                    break
+                else:
+                    add_related_entity.append(x)
+
+            for related_entity_id_str in add_related_entity:
+                try:
+                    related_entity_id = int(related_entity_id_str)
+                    getattr(entity, related_entity_methods["add"])(related_entity_id)
+                except ValueError:
+                    pass
+
+            getattr(entity, related_entity_methods["get"])()
+
+        elif choice == "4":
+            print("Returning to the previous menu...")
+            break
+        else:
+            print("Invalid choice, please try again.")
 
 
 if __name__ == "__main__":
