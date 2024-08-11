@@ -19,12 +19,24 @@ def write_to_database(file, instructions, values=None):
     """
     conn = sqlite3.connect(file)
     c = conn.cursor()
-    if values:
-        c.execute(instructions, values)
-    else:
-        c.execute(instructions)
-    conn.commit()
-    conn.close()
+    try:
+
+        if values:
+            c.execute(instructions, values)
+            conn.commit()
+        else:
+            c.execute(instructions)
+            conn.commit()
+
+    except sqlite3.Error as e:
+
+        print(f"An error occurred: {e}")
+
+    finally:
+
+        c.close()
+        conn.close()
+        return "Added/Updated successfully"
 
 
 def read_from_database(file, instructions, action="all", values=None):
@@ -55,6 +67,7 @@ def read_from_database(file, instructions, action="all", values=None):
     try:
         if values:
             c.execute(instructions, values)
+
         else:
             c.execute(instructions)
 

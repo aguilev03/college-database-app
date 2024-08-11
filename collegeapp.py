@@ -5,13 +5,7 @@ class Tables:
     def __init__(self):
         self.file = "college_data.db"
 
-    def validation(
-        self,
-        table,
-        columns,
-        value,
-        comparison,
-    ):
+    def validation(self, table, columns, value, comparison, extra=None):
         """
         Validates the existence of a record in a specified table based on a condition.
 
@@ -29,14 +23,25 @@ class Tables:
         Returns:
         bool: True if the record exists, False otherwise.
         """
-        command = f"SELECT {columns} FROM {table} WHERE {value} = ?"
-        result = database_functions.read_from_database(
-            self.file, (command, (comparison)), "one"
-        )
-        if result:
-            return True
+        if extra is None:
+            command = f"SELECT {columns} FROM {table} WHERE {value} = ?"
+            result = database_functions.read_from_database(
+                self.file, command, "one", (comparison,)
+            )
+            if result:
+                return True
+            else:
+                return False
         else:
-            return False
+            command = f"""SELECT {columns} FROM {table}
+                        WHERE {value[0]} = ? AND {value[1]} = ?"""
+            result = database_functions.read_from_database(
+                self.file, command, "one", comparison
+            )
+            if result:
+                return True
+            else:
+                return False
 
     def create_row(self, table_name, values):
         """
@@ -55,8 +60,10 @@ class Tables:
         None
         """
         placeholders = ", ".join(["?"] * len(values))
-        command = f"INSERT INTO {table_name} VALUES ({placeholders})"
-        database_functions.write_to_database(self.file, command, values)
+        command = f"""INSERT INTO {table_name} 
+                    VALUES ({placeholders})"""
+
+        return database_functions.write_to_database(self.file, command, values)
 
     def update_row(self, table_name, primary, primary_value, changes):
         """
@@ -80,7 +87,7 @@ class Tables:
                 SET {placeholders}
                 WHERE {primary} = ?"""
         values = tuple(changes.values()) + (primary_value,)
-        database_functions.write_to_database(self.file, command, values)
+        return database_functions.write_to_database(self.file, command, values)
 
     def delete_row(self, table_name, primary_key, primary_value, extra_arguments=None):
         """
@@ -100,10 +107,16 @@ class Tables:
         """
         if extra_arguments is None:
             command = f"DELETE FROM {table_name} WHERE {primary_key} = ?"
-            database_functions.write_to_database(self.file, command, (primary_value,))
+
+            return database_functions.write_to_database(
+                self.file, command, (primary_value,)
+            )
         else:
-            command = f"DELETE FROM {table_name} WHERE {primary_key[0]} = ? AND {primary_value[1]} = ?"
-            database_functions.write_to_database(self.file, command, primary_value)
+            command = f"""DELETE FROM {table_name} WHERE {primary_key[0]} = ? AND {primary_key[1]} = ?"""
+
+            return database_functions.write_to_database(
+                self.file, command, (primary_value[0], primary_value[1])
+            )
 
     def get_id(self, table, query):
         """
@@ -135,12 +148,13 @@ class Departments(Tables):
         self.name = name
         self.description = description
         self.table = "departments"
+        self.file = "college_data.db"
         self.id = id
 
     def add(self):
         if self.id is None:
-            self.create_row(self.table, (self.name, self.email, self.major))
-            self.id = self.get_id(self.table, self.name)
+            table = f"{self.table} (name, description)"
+            return self.create_row(table, (self.name, self.description))
 
     def remove(self):
         if self.id is not None:
@@ -163,11 +177,21 @@ class Departments(Tables):
             changes["name"] = name
         if description is not None:
             changes["description"] = description
-        if id is None:
-            changes["id"] = self.get_id(self.table, self.name)
 
         if changes:
-            self.update_row(self.table, "id", self.id, changes)
+            if id is None:
+                return "Department doesn't exist"
+            else:
+                return self.update_row(self.table, "id", self.id, changes)
+
+    def refresh(self):
+        command = "SELECT * FROM departments WHERE id = ?"
+        query_result = database_functions.read_from_database(
+            self.file, command, "one", (self.id,)
+        )
+
+        self.name = query_result[1]
+        self.description = query_result[2]
 
 
 class Courses(Tables):
@@ -181,12 +205,23 @@ class Courses(Tables):
         self.id = id
 
     def add(self):
+        table = f"{self.table} (name, department_id, description, credits)"
         if self.id is None:
-            self.create_row(self.table, (self.name, self.email, self.major))
-            self.id = self.get_id(self.table, self.name)
+            active_department = self.validation(
+                "departments", "*", "id", self.department_id
+            )
+            if active_department:
+                return self.create_row(
+                    table,
+                    (self.name, self.department_id, self.description, self.credits),
+                )
+            else:
+                return "Invalid Department"
 
     def remove(self):
         if self.id is not None:
+            self.delete_row("course_students", "course_id", self.id)
+            self.delete_row("course_instructors", "course_id", self.id)
             self.delete_row(self.table, "id", self.id)
 
     def update_course(
@@ -212,21 +247,42 @@ class Courses(Tables):
             changes["description"] = description
         if credits is not None:
             changes["credits"] = credits
-        if id is None:
-            self.id = self.get_id(self.table, "id")
 
         if changes:
-            self.update_row(self.table, "id", self.id, changes)
+            if id is None:
+                return "Course doesn't exist"
+            else:
+                active_department = self.validation(
+                    "departments", "*", "id", self.department_id
+                )
+            if active_department:
+                return self.update_row(self.table, "id", self.id, changes)
 
-    def get_instructor(self):
-        command = f"""SELECT instructors.name
-                    FROM instructors
-                    JOIN course_instructors ON instructors.id = course_instructors.instructor_id
-                    WHERE course_instructors.course_id = ?"""
-
+    def get_department_name(self):
+        command = """SELECT 
+                        name AS department_name
+                    FROM 
+                        departments
+                    WHERE 
+                        id = ?;
+                    """
         return database_functions.read_from_database(
+            self.file,
+            command,
+            "one",
+            (self.department_id,),
+        )
+
+    def refresh(self):
+        command = "SELECT * FROM courses WHERE id = ?"
+        query_result = database_functions.read_from_database(
             self.file, command, "one", (self.id,)
         )
+
+        self.name = query_result[1]
+        self.department_id = query_result[2]
+        self.description = query_result[3]
+        self.credits = query_result[4]
 
 
 class Students(Tables):
@@ -240,9 +296,9 @@ class Students(Tables):
 
     def add(self):
         if self.id is None:
-            self.create_row(self.table, (self.name, self.email, self.major))
+            table = f"{self.table} (name, email, major)"
+            self.create_row(table, (self.name, self.email, self.major))
             print("Student added")
-            self.id = self.get_id(self.table, self.name)
 
     def update(self, name=None, email=None, major=None, id=None):
         """
@@ -263,27 +319,44 @@ class Students(Tables):
             changes["email"] = email
         if major is not None:
             changes["major"] = major
-        if id is None:
-            self.id = self.get_id(self.table, "id")
 
         if changes:
-            self.update_row(self.table, "id", self.id, changes)
+            if id is None:
+                return "Error"
+            else:
+                self.update_row(self.table, "id", self.id, changes)
+                return "successfully updated"
 
     def enroll(self, course_id):
         if self.id is not None:
             class_exist = self.validation("courses", "*", "id", course_id)
+
             if class_exist:
                 enrolled_check = self.validation(
                     "course_students", "*", course_id, self.id
                 )
+                print(enrolled_check)
                 if enrolled_check == False:
-                    self.create_row("course_students", (course_id, self.id))
+                    self.create_row(
+                        "course_students (course_id, student_id)", (course_id, self.id)
+                    )
 
     def withdrawl(self, course_id):
-        enrolled_check = self.validation("course_students", "*", course_id, self.id)
+
+        enrolled_check = self.validation(
+            "course_students",
+            "*",
+            ("course_id", "student_id"),
+            (course_id, self.id),
+            "a",
+        )
+        print(enrolled_check)
         if enrolled_check:
             self.delete_row(
-                "course_students", ("course_id", "student_id"), (course_id, self.id)
+                "course_students",
+                ("course_id", "student_id"),
+                (course_id, self.id),
+                "A",
             )
 
     def remove(self):
@@ -291,31 +364,53 @@ class Students(Tables):
             self.delete_row(self.table, "id", self.id)
 
     def get_courses(self):
-        columns = [
-            "courses.id",
-            "courses.name",
-            "courses.department_id",
-            "courses.description",
-            "courses.credits",
-        ]
 
-        tables = ("courses", "course_students")
-
-        comparison = "courses.id = course_students.course_id"
-
-        where = "course_students.student_id"
-
-        set_columns = ", ".join([f"{column}" for column in columns])
-        command = f"""SELECT {set_columns}
-                FROM {tables[0]}
-                JOIN {tables[1]} ON {comparison}
-                WHERE {where} = ?"""
-        print(self.id)
-        classes_registered = database_functions.read_from_database(
+        command = """SELECT 
+                        courses.id AS course_id,
+                        courses.name AS course_name,
+                        courses.description AS course_description,
+                        courses.credits AS course_credits,
+                        instructors.id AS instructor_id,
+                        instructors.name AS instructor_name,
+                        instructors.email AS instructor_email
+                    FROM 
+                        courses
+                    JOIN 
+                        course_students ON courses.id = course_students.course_id
+                    JOIN 
+                        students ON course_students.student_id = students.id
+                    JOIN 
+                        course_instructors ON courses.id = course_instructors.course_id
+                    JOIN 
+                        instructors ON course_instructors.instructor_id = instructors.id
+                    WHERE 
+                        students.id = ?"""
+        query_result = database_functions.read_from_database(
             self.file, command, "all", (self.id,)
         )
-        print(classes_registered)
-        return classes_registered
+
+        columns = [
+            "course_id",
+            "course_name",
+            "course_description",
+            "course_credits",
+            "instructor_id",
+            "instructor_name",
+            "instructor_email",
+        ]
+        student_courses = [dict(zip(columns, row)) for row in query_result]
+        return student_courses
+
+    def refresh(self):
+        command = "SELECT * FROM students WHERE id = ?"
+        query_result = database_functions.read_from_database(
+            self.file, command, "one", (self.id,)
+        )
+        print(query_result)
+
+        self.name = query_result[1]
+        self.email = query_result[2]
+        self.major = query_result[3]
 
 
 class Instructors(Tables):
@@ -328,9 +423,18 @@ class Instructors(Tables):
         self.id = id
 
     def add(self):
+        table = f"{self.table} (name, email, department_id)"
         if self.id is None:
-            self.create_row(self.table, (self.name, self.email, self.major))
-            self.id = self.get_id(self.table, self.name)
+            active_department = self.validation(
+                "departments", "*", "id", self.department_id
+            )
+            if active_department:
+                return self.create_row(
+                    table, (self.name, self.email, self.department_id)
+                )
+
+            else:
+                return "Department doesn't exist"
 
     def update_instructor(self, name=None, email=None, department_id=None, id=None):
         """
@@ -351,55 +455,150 @@ class Instructors(Tables):
             changes["email"] = email
         if department_id is not None:
             changes["department_id"] = department_id
-        if id is None:
-            self.id = self.get_id(self.table, "id")
 
         if changes:
-            self.update_row(self.table, "id", self.id, changes)
+            if id is None:
+                return "Instructor doesn't exist"
+            else:
+                active_department = self.validation(
+                    "departments", "*", "id", self.department_id
+                )
+            if active_department:
+                return self.update_row(self.table, "id", self.id, changes)
 
     def assign_course(self, course_id):
         if self.id is not None:
             class_exist = self.validation("courses", "*", "id", course_id)
             if class_exist:
                 assigned_check = self.validation(
-                    "course_instructors", "*", course_id, self.id
+                    "course_instructors",
+                    "*",
+                    ("course_id", "instructor_id"),
+                    (course_id, self.id),
+                    "a",
                 )
                 if assigned_check == False:
-                    self.create_row("course_instructors", (course_id, self.id))
+                    self.create_row(
+                        "course_instructors (course_id, instructor_id)",
+                        (course_id, self.id),
+                    )
 
     def unassign(self, course_id):
-        assigned_check = self.validation("course_instructors", "*", course_id, self.id)
+        assigned_check = self.validation(
+            "course_instructors",
+            "*",
+            ("course_id", "instructor_id"),
+            (course_id, self.id),
+            "a",
+        )
         if assigned_check:
             self.delete_row(
                 "course_instructors",
                 ("course_id", "instructor_id"),
                 (course_id, self.id),
+                "A",
             )
 
     def remove(self):
         if self.id is not None:
             self.delete_row(self.table, "id", self.id)
 
+    def get_courses(self):
+
+        command = """SELECT 
+                        courses.id AS course_id,
+                        courses.name AS course_name,
+                        courses.description AS course_description,
+                        courses.credits AS course_credits
+                    FROM 
+                        courses
+                    JOIN 
+                        course_instructors ON courses.id = course_instructors.course_id
+                    JOIN 
+                        instructors ON course_instructors.instructor_id = instructors.id
+                    WHERE 
+                        instructors.id = ?;"""
+        query_result = database_functions.read_from_database(
+            self.file, command, "all", (self.id,)
+        )
+
+        columns = [
+            "course_id",
+            "course_name",
+            "course_description",
+            "course_credits",
+        ]
+        instructor_courses = [dict(zip(columns, row)) for row in query_result]
+        return instructor_courses
+
+    def get_department_name(self):
+        command = """SELECT 
+                        name AS department_name
+                    FROM 
+                        departments
+                    WHERE 
+                        id = ?;
+                    """
+        return database_functions.read_from_database(
+            self.file,
+            command,
+            "one",
+            (self.department_id,),
+        )
+
+    def get_assigned_courses(self):
+        command = """SELECT 
+                        courses.id AS course_id,
+                        courses.name AS course_name,
+                        courses.description AS course_description,
+                        courses.credits AS course_credits
+                    FROM 
+                        courses
+                    JOIN 
+                        course_instructors ON courses.id = course_instructors.course_id
+                    JOIN 
+                        instructors ON course_instructors.instructor_id = instructors.id
+                    WHERE 
+                        instructors.id = ?;"""
+
+        query_result = database_functions.read_from_database(
+            self.file, command, "all", (self.id,)
+        )
+        columns = ["course_id", "course_name", "course_description", "course_credits"]
+        assigned_courses = [dict(zip(columns, row)) for row in query_result]
+        return assigned_courses
+
+    def refresh(self):
+        command = "SELECT * FROM instructors WHERE id = ?"
+        query_result = database_functions.read_from_database(
+            self.file, command, "one", (self.id,)
+        )
+        print(query_result)
+
+        self.name = query_result[1]
+        self.email = query_result[2]
+        self.department_id = query_result[3]
+
 
 class Staff(Tables):
-    def __init__(self, name, role, department_id, id=None):
+    def __init__(self, name, role, id=None):
         self.name = name
         self.role = role
-        self.department_id = department_id
         self.file = "college_data.db"
         self.table = "staff"
         self.id = id
 
     def add(self):
+
         if self.id is None:
-            self.create_row(self.table, (self.name, self.email, self.major))
-            self.id = self.get_id(self.table, self.name)
+            table = f"{self.table} (name, role, department_id)"
+            return self.create_row(table, (self.name, self.role, "NULL"))
 
     def remove(self):
         if self.id is not None:
-            self.delete_row(self.table, "id", self.id)
+            return self.delete_row(self.table, "id", self.id)
 
-    def update_staff(self, name=None, role=None, department_id=None, id=None):
+    def update_staff(self, name=None, role=None, id=None):
         """
         Updates the department's name or description.
 
@@ -416,38 +615,174 @@ class Staff(Tables):
             changes["name"] = name
         if role is not None:
             changes["role"] = role
-        if department_id is not None:
-            changes["department_id"] = department_id
         if id is None:
             self.id = self.get_id(self.table, "id")
 
         if changes:
-            self.update_row(self.table, "id", self.id, changes)
+            return self.update_row(self.table, "id", self.id, changes)
+
+    def refresh(self):
+        command = "SELECT * FROM staff WHERE id = ?"
+        query_result = database_functions.read_from_database(
+            self.file, command, "one", (self.id,)
+        )
+
+        self.name = query_result[1]
+        self.role = query_result[2]
 
 
-class Views:
+class Student_views:
     def __init__(self):
         self.file = "college_data.db"
 
-    def get_table_data(self, table, columns="*"):
-        """
-        Retrieves specified columns or all columns from the given table in the database.
+    def get_students(self):
 
-        This function constructs an SQL SELECT statement to fetch data from the specified
-        table. If no specific columns are provided, all columns are selected by default.
+        command = "SELECT * FROM students"
+        query_result = database_functions.read_from_database(self.file, command)
+        columns = ["id", "name", "email", "major"]
+        students_list = [dict(zip(columns, row)) for row in query_result]
+        return students_list
 
-        Parameters:
-        table (str): The name of the table to retrieve data from.
-        columns (str): A comma-separated string of column names to retrieve, or "*" to retrieve all columns.
+    def get_student_classes(self, id):
+        command = """SELECT 
+                        courses.id AS course_id,
+                        courses.name AS course_name,
+                        courses.description AS course_description,
+                        courses.credits AS course_credits,
+                        instructors.id AS instructor_id,
+                        instructors.name AS instructor_name,
+                        instructors.email AS instructor_email
+                    FROM 
+                        courses
+                    JOIN 
+                        course_students ON courses.id = course_students.course_id
+                    JOIN 
+                        students ON course_students.student_id = students.id
+                    JOIN 
+                        course_instructors ON courses.id = course_instructors.course_id
+                    JOIN 
+                        instructors ON course_instructors.instructor_id = instructors.id
+                    WHERE 
+                        students.id = ?"""
+        query_result = database_functions.read_from_database(
+            self.file, command, "all", (id,)
+        )
+        columns = [
+            "course_id",
+            "course_name",
+            "course_description",
+            "course_credits",
+            "instructor_id",
+            "instructor_name",
+            "instructor_email",
+        ]
+        student_courses = [dict(zip(columns, row)) for row in query_result]
+        return student_courses
 
-        Returns:
-        list: A list of tuples containing the rows of the result set.
-        """
-        if columns == "*":
-            command = f"SELECT * FROM {table}"
-        else:
-            command = f"SELECT {columns} FROM {table}"
+    def get_all_courses(self):
+        command = """SELECT
+                        courses.id AS course_id,
+                        courses.name AS course_name,
+                        courses.description AS course_description,
+                        courses.credits AS course_credits,
+                        instructors.id AS instructor_id,
+                        instructors.name AS instructor_name,
+                        instructors.email AS instructor_email
+                    FROM
+                        courses
+                    JOIN
+                        course_instructors ON courses.id = course_instructors.course_id
+                    JOIN 
+                        instructors ON course_instructors.instructor_id = instructors.id"""
+        query_result = database_functions.read_from_database(self.file, command)
 
-        data = database_functions.read_from_database(self.file, command)
+        columns = [
+            "course_id",
+            "course_name",
+            "course_description",
+            "course_credits",
+            "instructors_id",
+            "instructor_name",
+            "instructor_email",
+        ]
+        all_courses = [dict(zip(columns, row)) for row in query_result]
+        return all_courses
 
-        return data
+    def get_all_instructors(self):
+
+        command = """SELECT 
+    instructors.id AS instructor_id,
+    instructors.name AS instructor_name,
+    instructors.email AS instructor_email,
+    departments.id AS department_id,
+    departments.name AS department_name,
+    departments.description AS department_description
+FROM 
+    instructors
+JOIN 
+    departments 
+ON 
+    instructors.department_id = departments.id;
+
+                    """
+        query_result = database_functions.read_from_database(self.file, command)
+        columns = [
+            "id",
+            "name",
+            "email",
+            "department_id",
+            "department_name",
+            "department_descriptions",
+        ]
+        instructor_list = [dict(zip(columns, row)) for row in query_result]
+        return instructor_list
+
+    def get_all_departments(self):
+        command = "SELECT * FROM departments"
+        query_result = database_functions.read_from_database(self.file, command)
+        columns = ["id", "name", "description"]
+        course_list = [dict(zip(columns, row)) for row in query_result]
+        return course_list
+
+    def get_courses_info(self):
+        command = """SELECT 
+                        courses.id AS course_id,
+                        courses.name AS course_name,
+                        courses.credits AS course_credits,
+                        courses.description AS course_description,
+                        COUNT(DISTINCT course_students.student_id) AS student_count,
+                        COUNT(DISTINCT course_instructors.instructor_id) AS instructor_count
+                    FROM 
+                        courses
+                    LEFT JOIN 
+                        course_students ON courses.id = course_students.course_id
+                    LEFT JOIN 
+                        course_instructors ON courses.id = course_instructors.course_id
+                    GROUP BY 
+                        courses.id, courses.name;
+                    """
+        query_result = database_functions.read_from_database(self.file, command)
+        columns = [
+            "course_id",
+            "course_name",
+            "course_credits",
+            "course_description",
+            "student_count",
+            "instructor_count",
+        ]
+        course_list = [dict(zip(columns, row)) for row in query_result]
+        return course_list
+
+    def get_all_courses(self):
+        command = "SELECT * FROM courses"
+        query_result = database_functions.read_from_database(self.file, command)
+        columns = ["id", "name", "department_id", "description", "credits"]
+        course_list = [dict(zip(columns, row)) for row in query_result]
+        return course_list
+
+    def get_all_staff(self):
+        command = "SELECT * FROM staff"
+        query_result = database_functions.read_from_database(self.file, command)
+        columns = ["id", "name", "role", "department_id"]
+        staff_list = [dict(zip(columns, row)) for row in query_result]
+        return staff_list
