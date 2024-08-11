@@ -215,7 +215,16 @@ def manage_department_detail(department):
 def manage_students():
     while True:
         clear_screen()
+
         student_view = collegeapp.Student_views()
+        student_attributes = ["name", "email", "major"]
+        display_columns = ["id ", "name", "email", "major"]
+        manage_entities(
+            "student",
+            collegeapp.Student_views,
+            student_attributes,
+            display_columns,
+        )
         student_list = student_view.get_students()
         print("id\tname\temail\tmajor")
         for student in student_list:
@@ -1124,6 +1133,8 @@ def database_reset():
 
 
 def manage_entities(
+    command,
+    command_mapping,
     entity_name,
     entity_view_class,
     entity_class,
@@ -1131,150 +1142,175 @@ def manage_entities(
     display_columns,
     manage_related=None,
 ):
-    """
-    Manages the CRUD operations (Create, Read, Update, Delete) for a given entity type.
+    if command == "manage_entities":
+        if not all(
+            [entity_name, entity_view_class, entity_class, attributes, display_columns]
+        ):
+            print("Missing required arguments for managing entities.")
+            return
 
-    Args:
-        entity_name (str): The name of the entity to manage (e.g., 'Student', 'Course'). This is used to dynamically
-                           generate the view and modify operations for the specific entity.
-        entity_view_class (class): The class responsible for retrieving the list of entities. It should have a method
-                                   named `get_<entity_name.lower()>s` that returns a list of entities.
-        entity_class (class): The class representing the entity. Instances of this class will be created, viewed, and
-                              removed based on user input.
-        attributes (list): A list of attribute names (as strings) that represent the properties of the entity. These
-                           attributes will be used to gather input from the user and display entity information.
-        display_columns (list): A list of column headers (as strings) to display when listing the entities. This should
-                                align with the order of `attributes`.
-        manage_related (function, optional): A function that handles any related entities or additional actions
-                                             when viewing an entity. If None, no related management is performed.
+        while True:
+            clear_screen()
+            entity_view = entity_view_class()
+            method_name = command_mapping.get(
+                "gather_data", f"get_{entity_name.lower()}s"
+            )
+            entity_list = getattr(entity_view, method_name)()
 
-    Returns:
-        None
+            print("\t".join(display_columns))
+            for entity in entity_list:
+                print("\t".join(str(entity[attr]) for attr in attributes))
 
-    This function provides a user interface for managing entities, allowing the user to add, remove, view, and
-    navigate through a list of entities. The interface dynamically adapts to the specific entity type being managed,
-    based on the provided arguments.
+            print(f"\nManage {entity_name.capitalize()}s Menu")
+            print(f"1) Add {entity_name.capitalize()}")
+            print(f"2) Delete {entity_name.capitalize()} by ID")
+            print(f"3) View {entity_name.capitalize()} by ID")
+            print("4) Back to Main Menu")
+            choice = input("Select an option: ").strip()
 
-    The main menu offers the following options:
-    1) Add a new entity: Prompts the user to input values for each attribute and adds the new entity to the database.
-    2) Remove an existing entity by ID: Prompts the user for an entity ID, then removes the entity from the database
-       if found.
-    3) View an existing entity by ID: Displays detailed information about the entity, and optionally allows for
-       managing related entities.
-    4) Back to the main menu: Exits the entity management loop and returns to the main program.
+            if choice == "1":
+                entity_data = []
+                for attr in attributes:
+                    if attr == "department_id":
+                        department_id = get_department_choice(
+                            entity_view.get_all_departments()
+                        )
+                        entity_data.append(department_id)
+                    else:
+                        entity_data.append(
+                            input(
+                                f"Please enter the {entity_name.capitalize()}'s {attr.capitalize()}: "
+                            )
+                        )
 
-    The function uses the provided `entity_view_class` to retrieve and display a list of entities, and it uses the
-    `entity_class` to create, remove, and view entities. The `attributes` and `display_columns` arguments ensure
-    that the correct fields are displayed and managed during the process.
-    """
+                entity = entity_class(*entity_data)
+                add_method = getattr(entity, command_mapping.get("add", "add"))
+                add_method()
+                print(f"{entity_name.capitalize()} added successfully.")
+                input("Press Enter to continue...")
+
+            elif choice == "2":
+                entity_id = input(
+                    f"Please enter the {entity_name.capitalize()} ID you would like to delete: "
+                ).strip()
+
+                try:
+                    entity_id = int(entity_id)
+                except ValueError:
+                    print("Invalid ID. Please enter a numeric value.")
+                    input("Press Enter to continue...")
+                    continue
+
+                entity_found = False
+
+                for entity in entity_list:
+                    if entity["id"] == entity_id:
+                        entity_found = True
+                        entity_instance = entity_class(
+                            *[entity[attr] for attr in attributes], entity["id"]
+                        )
+
+                        clear_screen()
+                        print(
+                            f"{entity_name.capitalize()} to delete: {entity_instance}"
+                        )
+
+                        remove_choice = input(
+                            f"Delete the {entity_name.capitalize()} from the database? y/N "
+                        ).strip()
+                        if remove_choice.lower() == "y":
+                            delete_method = getattr(
+                                entity_instance, command_mapping.get("delete", "remove")
+                            )
+                            delete_method()
+                            print(f"{entity_name.capitalize()} deleted successfully.")
+                        else:
+                            print("Delete operation cancelled.")
+                        input("Press Enter to continue...")
+                        break
+
+                if not entity_found:
+                    print(
+                        f"{entity_name.capitalize()} with the given ID was not found."
+                    )
+                    input("Press Enter to continue...")
+
+            elif choice == "3":
+                entity_id = input(
+                    f"Please enter the {entity_name.capitalize()} ID you would like to view: "
+                ).strip()
+
+                try:
+                    entity_id = int(entity_id)
+                except ValueError:
+                    print("Invalid ID. Please enter a numeric value.")
+                    input("Press Enter to continue...")
+                    continue
+
+                entity_found = False
+
+                for entity in entity_list:
+                    if entity["id"] == entity_id:
+                        entity_found = True
+                        entity_instance = entity_class(
+                            *[entity[attr] for attr in attributes], entity["id"]
+                        )
+
+                        clear_screen()
+
+                        if manage_related:
+                            manage_related(entity_instance)
+                        else:
+                            print(
+                                f"{entity_name.capitalize()} details: {entity_instance}"
+                            )
+                        input("Press Enter to continue...")
+
+                if not entity_found:
+                    print(
+                        f"{entity_name.capitalize()} with the given ID was not found."
+                    )
+                    input("Press Enter to continue...")
+
+            elif choice == "4":
+                print("Returning to the main menu...")
+                break
+            else:
+                print("Invalid choice, please try again.")
+    else:
+        print(f"Command '{command}' not recognized.")
+
+
+def display_departments(departments):
+    print("\nID\tName\tDescription")
+    for department in departments:
+        print(f"{department['id']}\t{department['name']}\t{department['description']}")
+
+
+def get_department_choice(departments):
     while True:
-        clear_screen()
-        entity_view = entity_view_class()
-        entity_list = getattr(entity_view, f"get_{entity_name.lower()}s")()
+        display_departments(departments)
+        department_assigned = input(
+            "Please assign a department by entering the ID or leave blank to skip: "
+        ).strip()
+        if department_assigned == "":
+            return None
 
-        print("\t".join(display_columns))
-        for entity in entity_list:
-            print("\t".join(str(entity[attr]) for attr in attributes))
+        # Convert input to integer and handle potential conversion error
+        try:
+            department_assigned = int(department_assigned)
+        except ValueError:
+            print("Invalid input. Please enter a numeric value.")
+            input("Press Enter to try again...")
+            continue
 
-        print(f"\nManage {entity_name.capitalize()}s Menu")
-        print(f"1) Add {entity_name.capitalize()}")
-        print(f"2) Remove {entity_name.capitalize()} by ID")
-        print(f"3) View {entity_name.capitalize()} by ID")
-        print("4) Back to Main Menu")
-        choice = input("Select an option: ").strip()
+        # Validate if the entered department ID exists
+        for department in departments:
+            if department["id"] == department_assigned:
+                return department_assigned
 
-        if choice == "1":
-            # Add entity logic here
-            entity_data = [
-                input(
-                    f"Please enter the {entity_name.capitalize()}'s {attr.capitalize()}: "
-                )
-                for attr in attributes
-            ]
-            entity = entity_class(*entity_data)
-            entity.add()
-            print(f"{entity_name.capitalize()} added successfully.")
-            input("Press Enter to continue...")
-
-        elif choice == "2":
-            # Remove entity logic here
-            entity_id = input(
-                f"Please enter the {entity_name.capitalize()} ID you would like to remove: "
-            ).strip()
-
-            try:
-                entity_id = int(entity_id)
-            except ValueError:
-                print("Invalid ID. Please enter a numeric value.")
-                input("Press Enter to continue...")
-                continue
-
-            entity_found = False
-
-            for entity in entity_list:
-                if entity["id"] == entity_id:
-                    entity_found = True
-                    entity_instance = entity_class(
-                        *[entity[attr] for attr in attributes], entity["id"]
-                    )
-
-                    clear_screen()
-                    print(f"{entity_name.capitalize()} to delete: {entity_instance}")
-
-                    remove_choice = input(
-                        f"Remove the {entity_name.capitalize()} from the database? y/N "
-                    ).strip()
-                    if remove_choice.lower() == "y":
-                        entity_instance.remove()
-                        print(f"{entity_name.capitalize()} removed successfully.")
-                    else:
-                        print("Delete operation cancelled.")
-                    input("Press Enter to continue...")
-                    break
-
-            if not entity_found:
-                print(f"{entity_name.capitalize()} with the given ID was not found.")
-                input("Press Enter to continue...")
-
-        elif choice == "3":
-            # View entity logic here
-            entity_id = input(
-                f"Please enter the {entity_name.capitalize()} ID you would like to view: "
-            ).strip()
-
-            try:
-                entity_id = int(entity_id)
-            except ValueError:
-                print("Invalid ID. Please enter a numeric value.")
-                input("Press Enter to continue...")
-                continue
-
-            entity_found = False
-
-            for entity in entity_list:
-                if entity["id"] == entity_id:
-                    entity_found = True
-                    entity_instance = entity_class(
-                        *[entity[attr] for attr in attributes], entity["id"]
-                    )
-
-                    clear_screen()
-
-                    if manage_related:
-                        manage_related(entity_instance)
-                    else:
-                        print(f"{entity_name.capitalize()} details: {entity_instance}")
-                    input("Press Enter to continue...")
-
-            if not entity_found:
-                print(f"{entity_name.capitalize()} with the given ID was not found.")
-                input("Press Enter to continue...")
-
-        elif choice == "4":
-            print("Returning to the main menu...")
-            break
-        else:
-            print("Invalid choice, please try again.")
+        print("Department ID not found. Please enter a valid ID.")
+        input("Press Enter to try again or leave blank to skip...")
 
 
 if __name__ == "__main__":
