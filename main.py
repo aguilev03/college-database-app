@@ -1123,5 +1123,159 @@ def database_reset():
         input("Database has been reset, Press Enter to continue")
 
 
+def manage_entities(
+    entity_name,
+    entity_view_class,
+    entity_class,
+    attributes,
+    display_columns,
+    manage_related=None,
+):
+    """
+    Manages the CRUD operations (Create, Read, Update, Delete) for a given entity type.
+
+    Args:
+        entity_name (str): The name of the entity to manage (e.g., 'Student', 'Course'). This is used to dynamically
+                           generate the view and modify operations for the specific entity.
+        entity_view_class (class): The class responsible for retrieving the list of entities. It should have a method
+                                   named `get_<entity_name.lower()>s` that returns a list of entities.
+        entity_class (class): The class representing the entity. Instances of this class will be created, viewed, and
+                              removed based on user input.
+        attributes (list): A list of attribute names (as strings) that represent the properties of the entity. These
+                           attributes will be used to gather input from the user and display entity information.
+        display_columns (list): A list of column headers (as strings) to display when listing the entities. This should
+                                align with the order of `attributes`.
+        manage_related (function, optional): A function that handles any related entities or additional actions
+                                             when viewing an entity. If None, no related management is performed.
+
+    Returns:
+        None
+
+    This function provides a user interface for managing entities, allowing the user to add, remove, view, and
+    navigate through a list of entities. The interface dynamically adapts to the specific entity type being managed,
+    based on the provided arguments.
+
+    The main menu offers the following options:
+    1) Add a new entity: Prompts the user to input values for each attribute and adds the new entity to the database.
+    2) Remove an existing entity by ID: Prompts the user for an entity ID, then removes the entity from the database
+       if found.
+    3) View an existing entity by ID: Displays detailed information about the entity, and optionally allows for
+       managing related entities.
+    4) Back to the main menu: Exits the entity management loop and returns to the main program.
+
+    The function uses the provided `entity_view_class` to retrieve and display a list of entities, and it uses the
+    `entity_class` to create, remove, and view entities. The `attributes` and `display_columns` arguments ensure
+    that the correct fields are displayed and managed during the process.
+    """
+    while True:
+        clear_screen()
+        entity_view = entity_view_class()
+        entity_list = getattr(entity_view, f"get_{entity_name.lower()}s")()
+
+        print("\t".join(display_columns))
+        for entity in entity_list:
+            print("\t".join(str(entity[attr]) for attr in attributes))
+
+        print(f"\nManage {entity_name.capitalize()}s Menu")
+        print(f"1) Add {entity_name.capitalize()}")
+        print(f"2) Remove {entity_name.capitalize()} by ID")
+        print(f"3) View {entity_name.capitalize()} by ID")
+        print("4) Back to Main Menu")
+        choice = input("Select an option: ").strip()
+
+        if choice == "1":
+            # Add entity logic here
+            entity_data = [
+                input(
+                    f"Please enter the {entity_name.capitalize()}'s {attr.capitalize()}: "
+                )
+                for attr in attributes
+            ]
+            entity = entity_class(*entity_data)
+            entity.add()
+            print(f"{entity_name.capitalize()} added successfully.")
+            input("Press Enter to continue...")
+
+        elif choice == "2":
+            # Remove entity logic here
+            entity_id = input(
+                f"Please enter the {entity_name.capitalize()} ID you would like to remove: "
+            ).strip()
+
+            try:
+                entity_id = int(entity_id)
+            except ValueError:
+                print("Invalid ID. Please enter a numeric value.")
+                input("Press Enter to continue...")
+                continue
+
+            entity_found = False
+
+            for entity in entity_list:
+                if entity["id"] == entity_id:
+                    entity_found = True
+                    entity_instance = entity_class(
+                        *[entity[attr] for attr in attributes], entity["id"]
+                    )
+
+                    clear_screen()
+                    print(f"{entity_name.capitalize()} to delete: {entity_instance}")
+
+                    remove_choice = input(
+                        f"Remove the {entity_name.capitalize()} from the database? y/N "
+                    ).strip()
+                    if remove_choice.lower() == "y":
+                        entity_instance.remove()
+                        print(f"{entity_name.capitalize()} removed successfully.")
+                    else:
+                        print("Delete operation cancelled.")
+                    input("Press Enter to continue...")
+                    break
+
+            if not entity_found:
+                print(f"{entity_name.capitalize()} with the given ID was not found.")
+                input("Press Enter to continue...")
+
+        elif choice == "3":
+            # View entity logic here
+            entity_id = input(
+                f"Please enter the {entity_name.capitalize()} ID you would like to view: "
+            ).strip()
+
+            try:
+                entity_id = int(entity_id)
+            except ValueError:
+                print("Invalid ID. Please enter a numeric value.")
+                input("Press Enter to continue...")
+                continue
+
+            entity_found = False
+
+            for entity in entity_list:
+                if entity["id"] == entity_id:
+                    entity_found = True
+                    entity_instance = entity_class(
+                        *[entity[attr] for attr in attributes], entity["id"]
+                    )
+
+                    clear_screen()
+
+                    if manage_related:
+                        manage_related(entity_instance)
+                    else:
+                        print(f"{entity_name.capitalize()} details: {entity_instance}")
+                    input("Press Enter to continue...")
+
+            if not entity_found:
+                print(f"{entity_name.capitalize()} with the given ID was not found.")
+                input("Press Enter to continue...")
+
+        elif choice == "4":
+            print("Returning to the main menu...")
+            break
+        else:
+            print("Invalid choice, please try again.")
+
+
 if __name__ == "__main__":
     database_check()
