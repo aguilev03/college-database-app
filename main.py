@@ -220,9 +220,28 @@ def manage_students():
             "add": "add",
             "delete": "remove",
         }
+        detailed_choices = [
+            "course",
+            {
+                "get": "get_courses",
+                "get_all": "get_all_courses",
+                "add": "enroll",
+                "remove": "withdrawl",
+            },
+            [
+                "course_id",
+                "course_name",
+                "course_description",
+                "course_credits",
+                "instructor_id",
+                "instructor_name",
+                "instructor_email",
+            ],
+            "Class ID\tClass Name\tDescription\t Credits\t Instructor ID\t Instructor Name\t Instructor Emails",
+        ]
         student_view = collegeapp.Student_views()
         student_attributes = ["id", "name", "email", "major"]
-        display_columns = ["id ", "name", "email", "major"]
+        display_columns = ["id", "name", "email", "major"]
         manage_entities(
             "manage_entities",
             command_mapping,
@@ -231,133 +250,9 @@ def manage_students():
             collegeapp.Students,
             student_attributes,
             display_columns,
+            detailed_choices,
+            manage_detail_long,
         )
-
-
-def manage_student_courses(student):
-    while True:
-        courses = {}
-        courses = student.get_courses()
-        enrolled_classes = []
-        clear_screen()
-
-        detailed_choices = [
-            "course",
-            {
-                "get": "get_courses",
-                "get_all": "get_all_courses",
-                "add": "enroll",
-                "remove": "withdraw",
-            },
-        ]
-        print(f"{student.name}\tStudent ID: {student.id}")
-        print(f"{student.email}\tMajor: {student.major} \n\nCurrently Enrolled")
-        if courses:
-            for course in courses:
-                print(
-                    f"ID: {course['course_id']}\t{course['course_name']}\tCredits: {course['course_credits']}\n",
-                    f"{course['course_description']}\t Instructed by: {course['instructor_name']}\n",
-                )
-
-        print("\nManage student Menu")
-        print("1) Update student information")
-        print("2) Remove Class")
-        print("3) Add Class")
-        print("4) Back to Previous Menu")
-        choice = input("Select an option: ").strip()
-
-        if choice == "1":
-            # edit student  logic here
-            clear_screen()
-            print(f"{student.name}\tStudent ID: {student.id}")
-            print(f"{student.email}\tMajor: {student.major} \n\nCurrently Enrolled")
-            updated_data = {
-                "name": input(
-                    "Please type updated Name or leave blank to leave unchanged: "
-                ),
-                "email": input(
-                    "Please type updated email or leave blank to leave unchanged: "
-                ),
-                "major": input(
-                    "Please type updated major or leave blank to leave unchanged: "
-                ),
-            }
-            update_push = {}
-            for key, value in updated_data.items():
-                if value != "":
-                    update_push[key] = value
-                else:
-                    update_push[key] = None
-
-            status = student.update(
-                update_push["name"],
-                update_push["email"],
-                update_push["major"],
-                student.id,
-            )
-            print(status)
-            student.refresh()
-            input("Press Enter to continue")
-
-        elif choice == "2":
-            clear_screen()
-            print(f"{student.name}\tStudent ID: {student.id}")
-            print(f"{student.email}\tMajor: {student.major} \n\nCurrently Enrolled")
-            if courses:
-                for course in courses:
-                    print(
-                        f"ID: {course['course_id']}\t{course['course_name']}\tCredits: {course['course_credits']}\n",
-                        f"{course['course_description']}\t Instructed by: {course['instructor_name']}\n",
-                    )
-
-                x = input(
-                    "Please enter Course ID to withdrawl from, leave blank to stop:  "
-                )
-                try:
-                    course_id = int(x)
-                    student.withdrawl(course_id)
-
-                except:
-                    continue
-
-        elif choice == "3":
-            # add class logic here
-            clear_screen()
-            print(f"{student.name}\tStudent ID: {student.id}")
-            print(f"{student.email}\tMajor: {student.major} \n\nAvailable classes: ")
-            views = collegeapp.Student_views()
-            all_courses = views.get_all_courses()
-            for course in all_courses:
-                if course["course_id"] not in enrolled_classes:
-                    print(
-                        f"ID: {course['course_id']}\t{course['course_name']}\tCredits: {course['course_credits']}\n",
-                        f"{course['course_description']}\t Instructed by: {course['instructor_name']}\n",
-                    )
-
-            add_course = []
-
-            while True:
-                x = input("Please enter Course ID to enroll, leave blank to stop:  ")
-                if x == "":
-                    break
-                else:
-                    add_course.append(x)
-
-            for course_id_str in add_course:
-                try:
-                    course_id = int(course_id_str)
-                    student.enroll(course_id)
-
-                except ValueError:
-                    pass
-
-            student.get_courses()
-
-        elif choice == "4":
-            print("Returning to the previous menu...")
-            break
-        else:
-            print("Invalid choice, please try again.")
 
 
 def manage_instructors():
@@ -1043,6 +938,7 @@ def manage_entities(
     entity_class,
     attributes,
     display_columns,
+    detail_data,
     manage_related=None,
 ):
     if command == "manage_entities":
@@ -1167,7 +1063,16 @@ def manage_entities(
                         clear_screen()
 
                         if manage_related:
-                            manage_related(entity_instance)
+                            manage_related(
+                                entity_instance,
+                                entity_name,
+                                entity_view_class,
+                                detail_data[0],
+                                detail_data[1],
+                                display_columns,
+                                detail_data[2],
+                                detail_data[3],
+                            )
                         else:
                             print(
                                 f"{entity_name.capitalize()} details: {entity_instance}"
@@ -1222,23 +1127,40 @@ def get_department_choice(departments):
 
 
 def manage_detail_long(
-    entity, entity_type, view_class, related_entity_name, related_entity_methods
+    entity,
+    entity_type,
+    view_class,
+    related_entity_name,
+    related_entity_methods,
+    display_columns,
+    related_display_columns,
+    headers,
 ):
     while True:
+        # Fetch related entities (e.g., courses for a student)
         related_entities = getattr(entity, related_entity_methods["get"])()
-        enrolled_entities = []
+        course_columns = ["id", "name", "department_id", "description", "credits"]
+        # Clear the screen and print the main entity's information
         clear_screen()
-        print(f"{entity.name}\t{entity_type.capitalize()} ID: {entity.id}")
-        print(
-            f"{entity.email}\t{related_entity_name.capitalize()}: {entity.major} \n\nCurrently Enrolled {related_entity_name.capitalize()}s"
-        )
+
+        # Display entity details using display_columns
+        print("\t".join(display_columns))  # Header for main entity
+        print("\t".join(str(getattr(entity, attr)) for attr in display_columns))
+
+        print(f"\nCurrently Enrolled {related_entity_name.capitalize()}s")
+
+        # Display related entities in a formatted table
         if related_entities:
+            print(headers)  # Display the header
             for related_entity in related_entities:
+
                 print(
-                    f"ID: {related_entity['course_id']}\t{related_entity['course_name']}\tCredits: {related_entity['course_credits']}\n",
-                    f"{related_entity['course_description']}\t Instructed by: {related_entity['instructor_name']}\n",
+                    "\t".join(
+                        str(related_entity[attr]) for attr in related_display_columns
+                    )
                 )
 
+        # Display management menu
         print(f"\nManage {entity_type.capitalize()} Menu")
         print(f"1) Update {entity_type} information")
         print(f"2) Remove {related_entity_name.capitalize()}")
@@ -1249,49 +1171,52 @@ def manage_detail_long(
         if choice == "1":
             # Edit entity logic here
             clear_screen()
-            print(f"{entity.name}\t{entity_type.capitalize()} ID: {entity.id}")
-            print(
-                f"{entity.email}\t{related_entity_name.capitalize()}: {entity.major} \n\nCurrently Enrolled {related_entity_name.capitalize()}s"
-            )
-            updated_data = {
-                "name": input(
-                    f"Please type updated Name or leave blank to leave unchanged: "
-                ),
-                "email": input(
-                    f"Please type updated email or leave blank to leave unchanged: "
-                ),
-                "major": input(
-                    f"Please type updated major or leave blank to leave unchanged: "
-                ),
-            }
-            update_push = {}
-            for key, value in updated_data.items():
-                if value != "":
-                    update_push[key] = value
-                else:
-                    update_push[key] = None
 
-            status = entity.update(
-                update_push["name"],
-                update_push["email"],
-                update_push["major"],
-                entity.id,
-            )
+            # Display entity details using display_columns
+            print("\t".join(display_columns))  # Header for main entity
+            print("\t".join(str(getattr(entity, attr)) for attr in display_columns))
+
+            print(f"\nCurrently Enrolled {related_entity_name.capitalize()}s")
+
+            # Dynamically handle updates based on display_columns (excluding ID)
+            updated_data = {}
+            for attr in display_columns:
+                if attr != "id":  # Skip ID
+                    updated_value = input(
+                        f"Please type updated {attr.capitalize()} or leave blank to leave unchanged: "
+                    )
+                    updated_data[attr] = updated_value if updated_value != "" else None
+
+            # Prepare arguments for the update method, keeping the ID last
+            update_args = [
+                updated_data.get(attr, getattr(entity, attr))
+                for attr in display_columns
+                if attr != "id"
+            ]
+            update_args.append(entity.id)  # Add the ID last
+
+            status = entity.update(*update_args)
             print(status)
             entity.refresh()
             input("Press Enter to continue")
 
         elif choice == "2":
             clear_screen()
-            print(f"{entity.name}\t{entity_type.capitalize()} ID: {entity.id}")
-            print(
-                f"{entity.email}\t{related_entity_name.capitalize()}: {entity.major} \n\nCurrently Enrolled {related_entity_name.capitalize()}s"
-            )
+
+            # Display entity details using display_columns
+            print("\t".join(display_columns))  # Header for main entity
+            print("\t".join(str(getattr(entity, attr)) for attr in display_columns))
+
+            print(f"\nCurrently Enrolled {related_entity_name.capitalize()}s")
+
             if related_entities:
+                print(headers)  # Display the header
                 for related_entity in related_entities:
                     print(
-                        f"ID: {related_entity['course_id']}\t{related_entity['course_name']}\tCredits: {related_entity['course_credits']}\n",
-                        f"{related_entity['course_description']}\t Instructed by: {related_entity['instructor_name']}\n",
+                        "\t".join(
+                            str(related_entity[attr])
+                            for attr in related_display_columns
+                        )
                     )
 
                 x = input(
@@ -1306,17 +1231,22 @@ def manage_detail_long(
         elif choice == "3":
             # Add related entity logic here
             clear_screen()
-            print(f"{entity.name}\t{entity_type.capitalize()} ID: {entity.id}")
-            print(
-                f"{entity.email}\t{related_entity_name.capitalize()}: {entity.major} \n\nAvailable {related_entity_name.capitalize()}s"
-            )
+
+            # Display entity details using display_columns
+            print("\t".join(display_columns))  # Header for main entity
+            print("\t".join(str(getattr(entity, attr)) for attr in display_columns))
+
+            print(f"\nAvailable {related_entity_name.capitalize()}s")
             views = view_class()
-            all_related_entities = getattr(views, related_entity_methods["get_all"])()
-            for related_entity in all_related_entities:
-                if related_entity["course_id"] not in enrolled_entities:
+            all_courses = getattr(views, related_entity_methods["get_all"])()
+            print("\t".join(course_columns))  # Display the header
+            for related_entity in all_courses:
+                print("")
+                if related_entity["id"] not in [
+                    e["course_id"] for e in related_entities
+                ]:
                     print(
-                        f"ID: {related_entity['course_id']}\t{related_entity['course_name']}\tCredits: {related_entity['course_credits']}\n",
-                        f"{related_entity['course_description']}\t Instructed by: {related_entity['instructor_name']}\n",
+                        "\t".join(str(related_entity[attr]) for attr in course_columns)
                     )
 
             add_related_entity = []
